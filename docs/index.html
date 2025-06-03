@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-gray-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subdomain & IP Extractor with Domain Filter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="text-gray-800">
+  <div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-3xl font-bold mb-4 text-center">🔍 Subdomain & IP Extractor</h1>
+
+    <label for="baseDomain" class="block font-semibold mb-1">Filter by Base Domain (optional):</label>
+    <input id="baseDomain" type="text" placeholder="e.g. arubanetworks.com" 
+           class="w-full mb-4 p-2 border rounded-lg border-gray-300 focus:outline-none focus:ring focus:border-blue-400" />
+
+    <textarea id="inputText" rows="15" placeholder="Paste your text here..." class="w-full p-3 border rounded-lg border-gray-300 focus:outline-none focus:ring focus:border-blue-400"></textarea>
+
+    <div class="flex justify-center my-4">
+      <button onclick="extractData()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">Extract</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Subdomains -->
+      <div class="bg-white shadow-md rounded-lg p-4">
+        <div class="flex justify-between items-center mb-2">
+          <h2 class="text-xl font-semibold">🌐 Subdomains</h2>
+          <button onclick="copyToClipboard('subdomainsOutput')" class="text-sm text-blue-600 hover:underline">Copy</button>
+        </div>
+        <pre id="subdomainsOutput" class="whitespace-pre-wrap break-words text-sm bg-gray-50 p-3 rounded-md h-60 overflow-y-auto border border-gray-200"></pre>
+      </div>
+
+      <!-- IPs -->
+      <div class="bg-white shadow-md rounded-lg p-4">
+        <div class="flex justify-between items-center mb-2">
+          <h2 class="text-xl font-semibold">📡 IP Addresses</h2>
+          <button onclick="copyToClipboard('ipsOutput')" class="text-sm text-blue-600 hover:underline">Copy</button>
+        </div>
+        <pre id="ipsOutput" class="whitespace-pre-wrap break-words text-sm bg-gray-50 p-3 rounded-md h-60 overflow-y-auto border border-gray-200"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function extractData() {
+      const text = document.getElementById('inputText').value.trim();
+      const baseDomain = document.getElementById('baseDomain').value.trim().toLowerCase();
+
+      if (!text) {
+        alert('Please paste some text first.');
+        return;
+      }
+
+      const lines = text.split('\n');
+
+      const subdomainsSet = new Set();
+      const ipsSet = new Set();
+
+      // Regexes for validation
+      const ipv4Regex = /\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.)){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b/;
+      const ipv6Regex = /\b((?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}|::1|::)\b/;
+      const domainRegex = /^(?:[a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
+
+      function domainMatchesBase(domain, base) {
+        if (!base) return true;
+        domain = domain.toLowerCase();
+        base = base.toLowerCase();
+        return domain === base || domain.endsWith('.' + base);
+      }
+
+      // Parse each line
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        // Split by common delimiters
+        let parts = trimmed.split(/[,:\t\s]+/);
+        parts.forEach(part => {
+          const item = part.trim();
+
+          if (ipv4Regex.test(item)) {
+            ipsSet.add(item);
+          } else if (ipv6Regex.test(item)) {
+            ipsSet.add(item);
+          } else if (domainRegex.test(item)) {
+            if (domainMatchesBase(item, baseDomain)) {
+              subdomainsSet.add(item);
+            }
+          }
+        });
+      });
+
+      // Also scan whole text for loose domains and IPs
+      const allDomains = text.match(/\b(?:[a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}\b/g) || [];
+      allDomains.forEach(d => {
+        if (domainRegex.test(d) && domainMatchesBase(d, baseDomain)) subdomainsSet.add(d);
+      });
+
+      const allIPv4 = text.match(ipv4Regex) || [];
+      allIPv4.forEach(ip => ipsSet.add(ip));
+
+      const allIPv6 = text.match(ipv6Regex) || [];
+      allIPv6.forEach(ip => ipsSet.add(ip));
+
+      const subdomains = [...subdomainsSet].sort();
+      const ips = [...ipsSet].sort();
+
+      document.getElementById('subdomainsOutput').textContent = subdomains.join('\n');
+      document.getElementById('ipsOutput').textContent = ips.join('\n');
+    }
+
+    function copyToClipboard(elementId) {
+      const text = document.getElementById(elementId).textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+      }).catch(() => {
+        alert('Failed to copy to clipboard.');
+      });
+    }
+  </script>
+</body>
+</html>
